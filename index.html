@@ -1,0 +1,67 @@
+import os, zipfile, shutil, pathlib, re
+base=pathlib.Path("/mnt/data/diana_daniyar_invitation")
+(base/"music").mkdir(exist_ok=True)
+shutil.copy2("/mnt/data/test_song.mp3", base/"music"/"diana-daniyar-song.mp3")
+html=(base/"index.html").read_text(encoding="utf-8")
+# Add an envelope opening screen before the page header.
+overlay = '''
+<div class="envelope-screen" id="envelopeScreen" aria-label="Чакыруу конверти">
+  <div class="envelope-card">
+    <div class="envelope-mark">D <span>&</span> D</div>
+    <div class="envelope-rule"></div>
+    <p class="envelope-kicker">СИЗГЕ АРНАЛГАН ЧАКЫРУУ</p>
+    <h1 class="envelope-names">Диана <i>&</i> Данияр</h1>
+    <p class="envelope-date">25 АПРЕЛЬ 2027 · 18:00</p>
+    <button class="btn envelope-open" id="openInvitation" type="button">КОНВЕРТТИ АЧУУ ♡</button>
+    <p class="envelope-hint">Чакыруу менен бирге музыка жаңырсын</p>
+  </div>
+</div>
+'''
+html=html.replace('<body>','<body>\n'+overlay,1)
+# Add styles before </style>
+extra_css = '''
+.envelope-screen{position:fixed;inset:0;z-index:20;background:linear-gradient(145deg,#f8f5ee,#eee7da);display:grid;place-items:center;padding:24px;transition:opacity .8s ease,visibility .8s ease}
+.envelope-screen.closed{opacity:0;visibility:hidden;pointer-events:none}
+.envelope-card{width:min(100%,430px);min-height:520px;background:#fbf9f4;border:1px solid #c9b58f;outline:1px solid #e5dccb;outline-offset:-9px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:42px 24px;box-shadow:0 18px 55px #594a3020;position:relative}
+.envelope-card:before,.envelope-card:after{content:"";position:absolute;width:42px;height:42px;border-color:#b79a68;opacity:.75}
+.envelope-card:before{top:22px;left:22px;border-top:1px solid;border-left:1px solid}.envelope-card:after{bottom:22px;right:22px;border-bottom:1px solid;border-right:1px solid}
+.envelope-mark{font:500 32px 'Cormorant Garamond',serif;color:#927951;letter-spacing:.12em}.envelope-mark span,.envelope-names i{color:#b89d72}
+.envelope-rule{width:48px;height:1px;background:#b89d72;margin:22px auto}
+.envelope-kicker{font-size:9px;letter-spacing:.25em;color:#9b835e}
+.envelope-names{font:400 clamp(38px,10vw,58px)/1 'Cormorant Garamond',serif;color:#8e7652;margin:18px 0}
+.envelope-date{font-size:11px;letter-spacing:.17em;color:#786b57;margin:12px 0 28px}
+.envelope-hint{font-size:10px;color:#9b9488;margin-top:18px}
+.music.playing{background:#ad9161;color:white;box-shadow:0 4px 18px #ad916155}
+'''
+html=html.replace('</style>',extra_css+'</style>',1)
+# Venue update
+html=html.replace('<p class="copy">25-апрель · Саат 18:00</p><p class="note">Ресторандын так дареги кошулганда карта шилтемеси ушул жерге жайгаштырылат.</p>',
+'''<p class="copy">25-апрель 2027 · Саат 18:00</p><p class="copy">Бишкек шаары</p><a class="btn" style="margin-top:18px" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=%D0%90%D0%BB%D0%B0+%D0%A2%D0%BE%D0%BE+%D1%80%D0%B5%D1%81%D1%82%D0%BE%D1%80%D0%B0%D0%BD%D1%8B+%D0%91%D0%B8%D1%88%D0%BA%D0%B5%D0%BA">КАРТАДАН КӨРҮҮ ↗</a><p class="note">Дарек: Бишкек шаары. Картадан ресторандын аталышы боюнча издөө ачылат.</p>''')
+# Correct visible year in hero/date/footer
+html=html.replace('25 АПРЕЛЬ · 18:00','25 АПРЕЛЬ 2027 · 18:00')
+html=html.replace('25-апрель</h2>','25-апрель 2027</h2>')
+html=html.replace('Countdown 2027-жылдын 25-апрелиндеги саат 18:00гө коюлду. Жыл башка болсо, датаны өзгөртүү керек.','Countdown 2027-жылдын 25-апрелиндеги саат 18:00гө коюлду.')
+# Audio element and interaction
+html=html.replace('<button class="music" id="music" aria-label="Музыка">♫</button>',
+'''<audio id="weddingAudio" preload="metadata" loop><source src="music/diana-daniyar-song.mp3" type="audio/mpeg"></audio>
+<button class="music" id="music" aria-label="Музыканы ойнотуу же токтотуу" title="Музыка">♫</button>''')
+old='''// Музыка файлы кошулганда images/ эмес, music/wedding.mp3 жолун туташтырыңыз.
+document.getElementById('music').addEventListener('click',()=>alert('Фондук музыка файлы азырынча кошула элек. Сүйүктүү ырыңызды жиберсеңиз, сайтка кошобуз.'));'''
+new='''// Музыка конверт ачылганда башталат; браузер уруксат бербесе, музыка баскычын басыңыз.
+const audio=document.getElementById('weddingAudio'),musicButton=document.getElementById('music');
+async function toggleMusic(){if(audio.paused){try{await audio.play();musicButton.classList.add('playing');}catch(err){musicButton.title='Музыканы кайра басып ойнотуңуз';}}else{audio.pause();musicButton.classList.remove('playing');}}
+musicButton.addEventListener('click',toggleMusic);
+document.getElementById('openInvitation').addEventListener('click',async()=>{document.getElementById('envelopeScreen').classList.add('closed');await toggleMusic();});
+'''
+html=html.replace(old,new)
+(base/"index.html").write_text(html,encoding="utf-8")
+# Rebuild archive with root folder contents
+zip_path=pathlib.Path("/mnt/data/diana_daniyar_invitation.zip")
+with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED) as z:
+    for p in base.rglob("*"):
+        if p.is_file():
+            z.write(p, p.relative_to(base.parent))
+print("Updated site:", (base/"index.html").stat().st_size, "bytes")
+print("Music:", (base/"music"/"diana-daniyar-song.mp3").stat().st_size, "bytes")
+print("ZIP:", zip_path.stat().st_size, "bytes")
+  
